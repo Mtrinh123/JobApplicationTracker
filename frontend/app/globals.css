@@ -1,0 +1,11 @@
+body { font-family: system-ui, sans-serif; margin: 0 auto; padding: 16px; max-width: 1200px; }
+form { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+form input { padding: 6px; }
+form input[name="url"] { flex: 1 1 300px; }
+.reminders { background: #fff4e5; border: 1px solid #f0b46c; padding: 8px 12px; margin-bottom: 16px; }
+.board { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.column { background: #f4f4f5; padding: 8px; border-radius: 6px; }
+.column h2 { font-size: 14px; text-transform: uppercase; margin: 4px 0 8px; }
+.card { background: white; border: 1px solid #ddd; border-radius: 4px; padding: 8px; margin-bottom: 8px; display: grid; gap: 4px; }
+.card.due { border-color: #e67e22; }
+.card a { font-size: 13px; }
