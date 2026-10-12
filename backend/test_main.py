@@ -1,5 +1,17 @@
-"""Run with: python test_parse.py"""
-from main import check_password, hash_password, parse_posting
+"""Run with: python test_main.py"""
+from fastapi import HTTPException
+
+from main import (
+    FAIL_WINDOW,
+    MAX_FAILS,
+    check_password,
+    check_public,
+    failed_logins,
+    hash_password,
+    parse_posting,
+    summarize,
+    too_many_fails,
+)
 
 
 def page(title="", **meta):
@@ -26,4 +38,33 @@ assert check_password("correct horse", stored)
 assert not check_password("wrong horse", stored)
 assert hash_password("correct horse") != stored, "salt should differ each time"
 
-print(f"{len(cases)} parse cases and password checks passed")
+# Login limit: blocked after MAX_FAILS, free again once they age out
+failed_logins["a@b.co"].extend([100.0] * MAX_FAILS)
+assert too_many_fails("a@b.co", now=101.0)
+assert not too_many_fails("a@b.co", now=100.0 + FAIL_WINDOW + 1)
+assert "a@b.co" not in failed_logins
+
+# Link lookup refuses the server's own network. IP literals, so no internet needed
+for url in ["http://127.0.0.1/", "http://localhost:8000/docs", "http://169.254.169.254/", "http://10.0.0.1/",
+            "http://[::1]/", "http://[::ffff:127.0.0.1]/", "file:///etc/passwd"]:
+    try:
+        check_public(url)
+        raise AssertionError(f"{url} should be refused")
+    except HTTPException:
+        pass
+check_public("http://8.8.8.8/")
+
+history = [
+    {"job_id": 1, "status": "applied", "days": 10},
+    {"job_id": 1, "status": "interview", "days": 4},
+    {"job_id": 2, "status": "saved", "days": 2},
+    {"job_id": 2, "status": "applied", "days": 20},
+    {"job_id": 3, "status": "saved", "days": 1},
+]
+assert summarize(history) == {
+    "applied": 2, "responded": 1, "response_rate": 0.5,
+    "avg_days": {"saved": 1.5, "applied": 15.0, "interview": 4.0},
+}, summarize(history)
+assert summarize([])["response_rate"] is None
+
+print(f"{len(cases)} parse cases, password, login limit, link lookup and stats checks passed")

@@ -11,17 +11,19 @@ Paste a job link, track it through your pipeline, and never forget to follow up.
 | 🔗 **Smart add** | Paste a link and the company and role fill in |
 | 🗂️ **Pipeline board** | Drag jobs between saved → applied → interview → offer / rejected |
 | ⏰ **Reminders** | Follow-ups are highlighted on the board and can be emailed daily |
-| 📝 **Notes** | Recruiter names, interview dates, salary |
+| 📅 **Interviews** | Set the time on the card, see this week's at the top, add it to your calendar (.ics) |
+| 📊 **Stats** | Response rate and average days spent in each stage |
+| 📝 **Notes** | Recruiter names, salary, anything else |
 | 🔍 **Search & export** | Filter by company or role, download a CSV |
-| 🔐 **Accounts** | Private boards, hashed passwords, delete your account anytime |
-| 🌙 **Dark mode** | Works on a phone too |
+| 🔐 **Accounts** | Private boards, email confirmation, hashed passwords, login lockout after 5 wrong tries |
+| ⚙️ **Settings** | Turn reminder emails on or off, change your password, delete your account |
 
 ## 🧭 How it works
 
 ```mermaid
 flowchart LR
     U([You]) --> FE["Next.js<br/>:3000"]
-    FE --> BE["FastAPI<br/>:8000"]
+    FE -- "/api" --> BE["FastAPI<br/>:8000"]
     BE --> DB[("PostgreSQL<br/>:5433")]
     BE -.-> WEB(["Job posting"])
     R["remind.py<br/>daily"] --> DB
@@ -49,42 +51,52 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000 and create an account.
-
 ## 📁 Project layout
 
 ```
 backend/
   main.py         API, login, database setup
   remind.py       Daily follow-up reminders
-  test_main.py    Tests
-frontend/app/
-  page.js         Board
-  landing.js      Login / sign up
+  test_main.py    Tests (python test_main.py)
+frontend/
+  next.config.mjs Forwards /api to the backend
+  app/page.js     Board
+  app/landing.js  Login / sign up
+  app/settings/   Settings page
 docker-compose.yml
+render.yaml       Deploy the backend + database on Render
+
 ```
 
-## ⏰ Reminders
+## 📧 Email
+
+The app sends two kinds of email: a **confirmation link** when someone signs up, and **daily follow-up reminders**. Reminders only go to accounts that confirmed their email and left reminders on in Settings.
+
 
 ```bash
 cd backend
 .venv\Scripts\python remind.py
 ```
 
-To get them by email, set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER` and `SMTP_PASSWORD`. For Gmail, use an [app password](https://myaccount.google.com/apppasswords).
-To run it every day, schedule it with Windows Task Scheduler or cron.
+Accounts created before email confirmation existed count as confirmed.
 
 ## 🔌 API
 
-Every route except `/register`, `/login` and `/logout` needs you to be logged in.
+Every route except `/register`, `/login`, `/logout` and `/verify-email` needs you to be logged in.
 
 | Route | Does |
 |---|---|
 | `POST /register` · `/login` · `/logout` | Accounts |
-| `GET` · `DELETE /me` | Your account (deleting needs `{password}`) |
+| `GET` · `PATCH` · `DELETE /me` | Your account. `PATCH {reminders}` saves settings; deleting needs `{password}` |
+| `POST /me/password` | Change password (`{current_password, new_password}`), signs out other devices |
+| `GET /verify-email?token=` | The link in the confirmation email. Redirects to the board |
+| `POST /verify-email/resend` | Send a new confirmation link (once a minute) |
 | `GET` · `POST /jobs` | List or add jobs |
 | `PATCH` · `DELETE /jobs/{id}` | Edit or remove a job |
-| `GET /preview?url=` | Guess the company and role from a link |
+| `GET /stats` | Response rate and average days per stage |
+| `GET /preview?url=` | Guess the company and role from a link (public addresses only) |
+
+The frontend reaches all of these at `/api/...`.
 
 Full interactive docs: http://localhost:8000/docs
 
@@ -92,24 +104,30 @@ Full interactive docs: http://localhost:8000/docs
 
 | Variable | Default |
 |---|---|
-| `DATABASE_URL` | `postgresql://tracker:tracker@127.0.0.1:5433/tracker` |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` |
+| `DATABASE_URL` (backend) | `postgresql://tracker:tracker@127.0.0.1:5433/tracker` |
+| `COOKIE_SECURE` (backend) | off. Set to `1` when served over HTTPS |
+| `APP_URL` (backend) | `http://localhost:3000`. The frontend's address, for links in emails |
+| `SMTP_*` (backend) | unset, so emails are printed. See [Email](#-email) |
+| `API_URL` (frontend, read at build time) | `http://localhost:8000` |
 
 ## 🛠️ Troubleshooting
 
 | Problem | Fix |
 |---|---|
 | `password authentication failed` | Another Postgres is answering. Use port **5433** |
-| `Failed to fetch` | The backend isn't running |
-| Keeps sending you to the login page | Open `localhost:3000`, not `127.0.0.1` |
+| Every action shows "Request failed" | The backend isn't running |
 | Link doesn't fill in | Some sites (LinkedIn, Workday) block it. Type the details in |
+| "Too many wrong passwords" | Wait 15 minutes, or restart the backend |
+| No confirmation email arrives | Without `SMTP_*` set it's printed in the backend terminal. With it set, check spam, then use Resend in Settings |
+
 
 ## 🗺️ Roadmap
 
 - [x] Pipeline board, reminders, notes, search, CSV export
 - [x] Auto-fill from the link, email reminders
 - [x] Accounts and account deletion
-- [ ] Interview dates with calendar export
-- [ ] Stats: response rate and time spent in each stage
-- [ ] Before going online: limit login attempts, HTTPS-only cookie, block private addresses in the link lookup
-- [ ] Deploy (Vercel + Render/Fly.io)
+- [x] Interview dates with calendar export
+- [x] Stats: response rate and time spent in each stage
+- [x] Before going online: limit login attempts, HTTPS-only cookie, block private addresses in the link lookup
+- [x] Deploy config (Render blueprint + Vercel)
+- [ ] Actually deploy it

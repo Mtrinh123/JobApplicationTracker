@@ -1,13 +1,10 @@
-"""Print every user's due follow-ups, and email each user their list if SMTP is set up.
+"""Email every user with confirmed email and reminders on their due follow-ups.
 
-Run it daily with cron or Task Scheduler.
+Without SMTP settings the emails are printed instead. Run it daily with cron or Task Scheduler.
 """
-import os
-import smtplib
-from email.message import EmailMessage
 from itertools import groupby
 
-from main import due_jobs
+from main import due_jobs, send_email
 
 due = due_jobs()
 if not due:
@@ -18,16 +15,5 @@ for email, jobs in groupby(due, key=lambda job: job["email"]):
         f"[{job['follow_up']}] {job['company']} - {job['role']} ({job['status']}) {job['url']}"
         for job in jobs
     ]
-    print(f"{email}:\n" + "\n".join(lines))
-
-    if os.getenv("SMTP_HOST"):
-        msg = EmailMessage()
-        msg["Subject"] = f"{len(lines)} job follow-up(s) due"
-        msg["From"] = os.environ["SMTP_USER"]
-        msg["To"] = email
-        msg.set_content("Time to follow up on:\n\n" + "\n".join(lines))
-        with smtplib.SMTP(os.environ["SMTP_HOST"], int(os.getenv("SMTP_PORT", "587"))) as smtp:
-            smtp.starttls()
-            smtp.login(os.environ["SMTP_USER"], os.environ["SMTP_PASSWORD"])
-            smtp.send_message(msg)
-        print(f"Emailed {email}")
+    send_email(email, f"{len(lines)} job follow-up(s) due", "Time to follow up on:\n\n" + "\n".join(lines))
+    print(f"Sent {len(lines)} reminder(s) to {email}")

@@ -1,8 +1,6 @@
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 export async function api(path, options = {}) {
-  const res = await fetch(API + path, {
-    credentials: "include",
+  // Proxied to the backend by next.config.mjs
+  const res = await fetch("/api" + path, {
     headers: { "Content-Type": "application/json" },
     ...options,
   });
