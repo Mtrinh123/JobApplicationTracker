@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: tracker
       POSTGRES_DB: tracker
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"  # localhost only, the password here is not secret
     volumes:
       - pgdata:/var/lib/postgresql/data
 

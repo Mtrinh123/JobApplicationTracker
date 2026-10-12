@@ -1,162 +1,115 @@
-# JobApplicationTracker
+# 📋 Job Application Tracker
 
-A small app for keeping track of job applications while job hunting.
+Paste a job link, track it through your pipeline, and never forget to follow up.
 
-- Save a job posting with its link, company and role
-- Move it through a pipeline: **saved → applied → interview → offer / rejected**
-- Get reminded when it's time to follow up
+**Next.js** · **FastAPI** · **PostgreSQL**
 
-**Stack:** Next.js (frontend) · FastAPI (backend) · PostgreSQL (database)
+## ✨ Features
 
-## How it works
+| | |
+|---|---|
+| 🔗 **Smart add** | Paste a link and the company and role fill in |
+| 🗂️ **Pipeline board** | Drag jobs between saved → applied → interview → offer / rejected |
+| ⏰ **Reminders** | Follow-ups are highlighted on the board and can be emailed daily |
+| 📝 **Notes** | Recruiter names, interview dates, salary |
+| 🔍 **Search & export** | Filter by company or role, download a CSV |
+| 🔐 **Accounts** | Private boards, hashed passwords, delete your account anytime |
+| 🌙 **Dark mode** | Works on a phone too |
+
+## 🧭 How it works
 
 ```mermaid
 flowchart LR
-    U([You]) --> FE["Next.js board<br/>localhost:3000"]
-    FE -- "REST / JSON" --> BE["FastAPI<br/>localhost:8000"]
-    BE --> DB[("PostgreSQL in Docker<br/>localhost:5433")]
-    R["remind.py<br/>(runs daily)"] --> DB
-    R --> OUT[/"List of follow-ups due"/]
+    U([You]) --> FE["Next.js<br/>:3000"]
+    FE --> BE["FastAPI<br/>:8000"]
+    BE --> DB[("PostgreSQL<br/>:5433")]
+    BE -.-> WEB(["Job posting"])
+    R["remind.py<br/>daily"] --> DB
+    R --> M[/"Email"/]
 ```
 
-1. You add a job on the board. The frontend sends it to the backend.
-2. The backend saves it in PostgreSQL with a follow-up date (7 days out by default).
-3. The board shows every job in a column for its status. Jobs whose follow-up date has passed are highlighted and listed at the top.
-4. `remind.py` runs on a schedule and prints the follow-ups that are due.
+## 🚀 Quick start
 
-A job only needs a follow-up while it's still in play, so reminders cover **saved**, **applied** and **interview** and skip **offer** and **rejected**.
+Needs **Docker Desktop**, **Python 3.10+** and **Node 18+**.
 
-## Project layout
-
-```
-JobApplicationTracker/
-├── docker-compose.yml     PostgreSQL database
-├── backend/
-│   ├── main.py            API and table setup
-│   ├── remind.py          Prints due follow-ups
-│   └── requirements.txt
-└── frontend/
-    └── app/
-        ├── page.js        Pipeline board
-        ├── layout.js
-        └── globals.css
-```
-
-## Getting started
-
-**You need:** Docker Desktop, Python 3.10+ and Node.js 18+.
-
-### 1. Start the database
-
-```
+```bash
+# 1. Database
 docker compose up -d
-```
 
-This runs PostgreSQL in Docker on port **5433**. It doesn't use 5432, so it won't clash with a Postgres already installed on your machine.
-
-### 2. Start the backend
-
-```
+# 2. Backend (http://localhost:8000/docs)
 cd backend
 python -m venv .venv
-.venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
+.venv\Scripts\activate        # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --reload
-```
 
-- API: http://localhost:8000
-- Interactive API docs: http://localhost:8000/docs
-
-The `jobs` table is created automatically the first time the backend starts.
-
-### 3. Start the frontend
-
-In a second terminal:
-
-```
+# 3. Frontend (http://localhost:3000)
 cd frontend
 npm install
 npm run dev
 ```
 
-Open http://localhost:3000.
+Open http://localhost:3000 and create an account.
 
-### Next time
-
-Docker Desktop restarts the database on its own. You only need two terminals:
+## 📁 Project layout
 
 ```
+backend/
+  main.py         API, login, database setup
+  remind.py       Daily follow-up reminders
+  test_main.py    Tests
+frontend/app/
+  page.js         Board
+  landing.js      Login / sign up
+docker-compose.yml
+```
+
+## ⏰ Reminders
+
+```bash
 cd backend
-.venv\Scripts\activate
-uvicorn main:app --reload
-```
-
-```
-cd frontend
-npm run dev
-```
-
-## Settings
-
-Both settings have defaults that work out of the box. Set them as environment variables if you need to change them.
-
-| Variable | Default | Used by |
-|---|---|---|
-| `DATABASE_URL` | `postgresql://tracker:tracker@localhost:5433/tracker` | backend |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | frontend |
-
-## API
-
-| Method | Path | What it does |
-|---|---|---|
-| `GET` | `/jobs` | List all jobs, newest first |
-| `POST` | `/jobs` | Add a job |
-| `PATCH` | `/jobs/{id}` | Change a job's company, role, status or follow-up date |
-| `DELETE` | `/jobs/{id}` | Remove a job |
-| `GET` | `/reminders` | Jobs that need a follow-up today or earlier |
-
-Example: add a job
-
-```
-curl -X POST http://localhost:8000/jobs \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com/jobs/123", "company": "Acme", "role": "Software Engineer"}'
-```
-
-`status` (default `applied`) and `follow_up` (default 7 days from today, as `YYYY-MM-DD`) are optional.
-
-## Daily reminders
-
-Run this from the `backend` folder to see which follow-ups are due:
-
-```
 .venv\Scripts\python remind.py
 ```
 
-```
-[2026-10-01] Globex - Intern (applied) https://example.com/jobs/456
-```
+To get them by email, set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER` and `SMTP_PASSWORD`. For Gmail, use an [app password](https://myaccount.google.com/apppasswords).
+To run it every day, schedule it with Windows Task Scheduler or cron.
 
-To run it every day automatically:
+## 🔌 API
 
-- **Windows (Task Scheduler):** create a daily task.
-  - Program: `C:\path\to\backend\.venv\Scripts\python.exe`
-  - Arguments: `remind.py`
-  - Start in: `C:\path\to\backend`
-- **macOS/Linux (cron):** run `crontab -e` and add
-  `0 9 * * * cd /path/to/backend && .venv/bin/python remind.py`
+Every route except `/register`, `/login` and `/logout` needs you to be logged in.
 
-## Troubleshooting
+| Route | Does |
+|---|---|
+| `POST /register` · `/login` · `/logout` | Accounts |
+| `GET` · `DELETE /me` | Your account (deleting needs `{password}`) |
+| `GET` · `POST /jobs` | List or add jobs |
+| `PATCH` · `DELETE /jobs/{id}` | Edit or remove a job |
+| `GET /preview?url=` | Guess the company and role from a link |
+
+Full interactive docs: http://localhost:8000/docs
+
+## ⚙️ Settings
+
+| Variable | Default |
+|---|---|
+| `DATABASE_URL` | `postgresql://tracker:tracker@127.0.0.1:5433/tracker` |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` |
+
+## 🛠️ Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| `password authentication failed for user "tracker"` | Another Postgres is answering. Check that `DATABASE_URL` uses port 5433 and that `docker compose up -d` is running. |
-| The board shows `Failed to fetch` | The backend isn't running. Start it with `uvicorn main:app --reload`. |
-| `docker compose` can't connect | Start Docker Desktop first. |
+| `password authentication failed` | Another Postgres is answering. Use port **5433** |
+| `Failed to fetch` | The backend isn't running |
+| Keeps sending you to the login page | Open `localhost:3000`, not `127.0.0.1` |
+| Link doesn't fill in | Some sites (LinkedIn, Workday) block it. Type the details in |
 
-## Roadmap
+## 🗺️ Roadmap
 
-- [ ] Fill in company and role from the posting link automatically
-- [ ] Email or desktop notifications for reminders
-- [ ] Notes for each application
-- [ ] UI updates
+- [x] Pipeline board, reminders, notes, search, CSV export
+- [x] Auto-fill from the link, email reminders
+- [x] Accounts and account deletion
+- [ ] Interview dates with calendar export
+- [ ] Stats: response rate and time spent in each stage
+- [ ] Before going online: limit login attempts, HTTPS-only cookie, block private addresses in the link lookup
+- [ ] Deploy (Vercel + Render/Fly.io)
