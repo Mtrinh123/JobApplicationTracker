@@ -83,7 +83,7 @@ export default function Home() {
     if (verified === null) return;
     setNotice(
       verified === "1"
-        ? "Email confirmed. Follow-up reminders will now reach your inbox."
+        ? "Email confirmed. Welcome to your board."
         : "That confirmation link is invalid or has expired. Log in and choose Resend email to get a new one."
     );
     history.replaceState(null, "", "/");
@@ -120,6 +120,13 @@ export default function Home() {
     } catch (e) {
       setResendStatus(e.message);
     }
+  }
+
+  // For when the link was opened in another browser or tab: this one still thinks the email is unconfirmed
+  async function checkAgain() {
+    const me = await api("/me").catch(() => null);
+    if (me?.email_verified) setUser(me);
+    else setResendStatus("Not confirmed yet. Click the link in the email, then try again.");
   }
 
   function add(e) {
@@ -159,6 +166,32 @@ export default function Home() {
   if (user === undefined) return null;
   if (!user) return <Landing onLogin={setUser} notice={notice} />;
 
+  if (!user.email_verified) {
+    return (
+      <>
+        <header className="nav">
+          <Brand as="h1" />
+          <div className="tools">
+            <span className="who">{user.email}</span>
+            <button onClick={logout}>Log out</button>
+          </div>
+        </header>
+        <main className="app">
+          {notice && <p className="notice" role="status">{notice}</p>}
+          <div className="verify">
+            <p>
+              <strong>Confirm your email to start.</strong> We sent a link to {user.email}. Your board opens once
+              you click it.
+            </p>
+            <button type="button" className="primary" onClick={checkAgain}>I've confirmed it</button>
+            <button type="button" onClick={resendEmail}>Resend email</button>
+            <p className="verify-status" role="status">{resendStatus}</p>
+          </div>
+        </main>
+      </>
+    );
+  }
+
   const loaded = jobs !== null;
   const all = jobs ?? [];
   const today = localDate();
@@ -193,17 +226,6 @@ export default function Home() {
 
       <main className="app">
         {notice && <p className="notice" role="status">{notice}</p>}
-
-        {!user.email_verified && (
-          <div className="verify">
-            <p>
-              <strong>Confirm your email.</strong> We sent a link to {user.email}. Reminder emails start once
-              it's confirmed.
-            </p>
-            <button type="button" onClick={resendEmail}>Resend email</button>
-            <p className="verify-status" role="status">{resendStatus}</p>
-          </div>
-        )}
 
         <form className="add" onSubmit={add}>
           <label className="url">

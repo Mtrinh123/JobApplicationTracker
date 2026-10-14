@@ -6,6 +6,9 @@ Paste a job link, track it through your pipeline, and never forget to follow up.
 
 **Next.js** · **FastAPI** · **PostgreSQL**
 
+
+**Hosting:** frontend on Vercel, API on Render, database on Neon.
+
 ## ✨ Features
 
 | | |
@@ -17,7 +20,7 @@ Paste a job link, track it through your pipeline, and never forget to follow up.
 | 📊 **Stats** | Response rate and average days spent in each stage |
 | 📝 **Notes** | Recruiter names, salary, anything else |
 | 🔍 **Search & export** | Filter by company or role, download a CSV |
-| 🔐 **Accounts** | Private boards, email confirmation, hashed passwords, login lockout after 5 wrong tries |
+| 🔐 **Accounts** | Private boards, password typed twice at signup, email must be confirmed before the board opens, hashed passwords, login lockout after 5 wrong tries |
 | ⚙️ **Settings** | Turn reminder emails on or off, change your password, delete your account |
 
 ## 🧭 How it works
@@ -95,7 +98,8 @@ cd frontend && npm ci && npm run build
 
 ## 📧 Email
 
-The app sends two kinds of email: a **confirmation link** when someone signs up, and **daily follow-up reminders**. Reminders only go to accounts that confirmed their email and left reminders on in Settings.
+The app sends two kinds of email: a **confirmation link** when someone signs up, and **daily follow-up reminders**. New accounts can't use the board until they click the confirmation link, which keeps out bots signing up with made-up addresses. Reminders only go to accounts that left them on in Settings.
+
 
 
 ```bash
@@ -107,7 +111,7 @@ Accounts created before email confirmation existed count as confirmed.
 
 ## 🔌 API
 
-Every route except `/register`, `/login`, `/logout` and `/verify-email` needs you to be logged in.
+Every route except `/register`, `/login`, `/logout` and `/verify-email` needs you to be logged in. `/jobs`, `/stats` and `/preview` also need a confirmed email (403 otherwise).
 
 | Route | Does |
 |---|---|
@@ -123,7 +127,7 @@ Every route except `/register`, `/login`, `/logout` and `/verify-email` needs yo
 
 The frontend reaches all of these at `/api/...`.
 
-Full interactive docs: http://localhost:8000/docs
+Full interactive docs: http://localhost:8000/docs locally, or [live](https://jobtracker-api-erta.onrender.com/docs)
 
 ## ⚙️ Settings
 
@@ -155,4 +159,4 @@ Full interactive docs: http://localhost:8000/docs
 - [x] Stats: response rate and time spent in each stage
 - [x] Before going online: limit login attempts, HTTPS-only cookie, block private addresses in the link lookup
 - [x] Deploy config (Render blueprint + Vercel)
-- [ ] Actually deploy it
+- [x] Actually deploy it

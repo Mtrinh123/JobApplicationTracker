@@ -169,6 +169,13 @@ def current_user(session: str | None = Cookie(default=None, alias=COOKIE)):
     raise HTTPException(401, "Please log in")
 
 
+def verified_user(user=Depends(current_user)):
+    """For the board: a confirmed email shows a real person signed up, not a bot with a made-up address."""
+    if not user["email_verified"]:
+        raise HTTPException(403, "Confirm your email first. The link is in your inbox")
+    return user
+
+
 class Credentials(BaseModel):
     email: str = Field(pattern=r"^\s*[^@\s]+@[^@\s]+\.[^@\s]+\s*$", max_length=254)
     password: str = Field(min_length=8, max_length=200)
@@ -336,7 +343,7 @@ CLEARABLE = {"follow_up", "interview_at"}
 
 
 @app.get("/jobs")
-def list_jobs(user=Depends(current_user)):
+def list_jobs(user=Depends(verified_user)):
     with db() as conn:
         return conn.execute(
             "select * from jobs where user_id = %s order by created_at desc", (user["id"],)
@@ -344,7 +351,7 @@ def list_jobs(user=Depends(current_user)):
 
 
 @app.post("/jobs", status_code=201)
-def create_job(job: JobIn, user=Depends(current_user)):
+def create_job(job: JobIn, user=Depends(verified_user)):
     follow_up = job.follow_up or date.today() + timedelta(days=7)
     with db() as conn:
         row = conn.execute(
@@ -357,7 +364,7 @@ def create_job(job: JobIn, user=Depends(current_user)):
 
 
 @app.patch("/jobs/{job_id}")
-def update_job(job_id: int, job: JobUpdate, user=Depends(current_user)):
+def update_job(job_id: int, job: JobUpdate, user=Depends(verified_user)):
     # Only the dates can be cleared, so null means "leave it" for the rest
     fields = {k: v for k, v in job.model_dump(exclude_unset=True).items() if v is not None or k in CLEARABLE}
     if not fields:
@@ -378,7 +385,7 @@ def update_job(job_id: int, job: JobUpdate, user=Depends(current_user)):
 
 
 @app.delete("/jobs/{job_id}", status_code=204)
-def delete_job(job_id: int, user=Depends(current_user)):
+def delete_job(job_id: int, user=Depends(verified_user)):
     with db() as conn:
         deleted = conn.execute("delete from jobs where id = %s and user_id = %s", (job_id, user["id"]))
         if deleted.rowcount == 0:
@@ -413,7 +420,7 @@ def summarize(history):
 
 
 @app.get("/stats")
-def stats(user=Depends(current_user)):
+def stats(user=Depends(verified_user)):
     with db() as conn:
         history = conn.execute(
             "select s.job_id, s.status,"
@@ -514,7 +521,7 @@ def parse_posting(html):
 
 
 @app.get("/preview")
-def preview(url: HttpUrl = Query(), user=Depends(current_user)):
+def preview(url: HttpUrl = Query(), user=Depends(verified_user)):
     # ponytail: the address is checked, then resolved again when fetched, so DNS rebinding could slip past.
     # Pin the checked IP if this ever runs next to anything sensitive
     check_public(str(url))

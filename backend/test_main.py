@@ -11,6 +11,7 @@ from main import (
     parse_posting,
     summarize,
     too_many_fails,
+    verified_user,
 )
 
 
@@ -67,4 +68,12 @@ assert summarize(history) == {
 }, summarize(history)
 assert summarize([])["response_rate"] is None
 
-print(f"{len(cases)} parse cases, password, login limit, link lookup and stats checks passed")
+confirmed = {"id": 1, "email_verified": True}
+assert verified_user(confirmed) is confirmed
+try:
+    verified_user({"id": 2, "email_verified": False})
+    raise AssertionError("an unconfirmed account should be kept off the board")
+except HTTPException as e:
+    assert e.status_code == 403
+
+print(f"{len(cases)} parse cases, password, login limit, link lookup, stats and email confirmation checks passed")

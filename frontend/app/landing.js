@@ -19,10 +19,16 @@ export default function Landing({ onLogin, notice }) {
 
   async function submit(e) {
     e.preventDefault();
+    const { confirm, ...creds } = Object.fromEntries(new FormData(e.target));
+    // Only catches typos, so it stays in the browser and the API never sees it
+    if (signup && confirm !== creds.password) {
+      setError("The passwords don't match.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      const body = JSON.stringify(Object.fromEntries(new FormData(e.target)));
+      const body = JSON.stringify(creds);
       onLogin(await api(signup ? "/register" : "/login", { method: "POST", body }));
     } catch (err) {
       setError(err.message);
@@ -68,6 +74,12 @@ export default function Landing({ onLogin, notice }) {
               />
             </label>
             {signup && <small>At least 8 characters.</small>}
+            {signup && (
+              <label>
+                Confirm password
+                <input name="confirm" type="password" minLength={8} autoComplete="new-password" required />
+              </label>
+            )}
             {error && <p className="error" role="alert">{error}</p>}
             <button className="primary" disabled={busy}>
               {busy ? "One moment..." : signup ? "Create account" : "Log in"}
