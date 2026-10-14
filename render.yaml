@@ -26,3 +26,5 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false
+      - key: SMTP_FROM
+        sync: false
