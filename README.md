@@ -98,7 +98,7 @@ cd frontend && npm ci && npm run build
 
 ## 📧 Email
 
-The app sends two kinds of email: a **confirmation link** when someone signs up, and **daily follow-up reminders**. New accounts can't use the board until they click the confirmation link, which keeps out bots signing up with made-up addresses. Reminders only go to accounts that left them on in Settings.
+The app sends two kinds of email: a **confirmation link** when someone signs up, and **daily follow-up reminders** listing each due job with how overdue it is. Both are branded HTML emails with a plain-text copy for email apps that don't show HTML. New accounts can't use the board until they click the confirmation link, which keeps out bots signing up with made-up addresses. Reminders only go to accounts that left them on in Settings.
 
 
 

@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import html
 import ipaddress
 import os
 import re
@@ -116,20 +117,56 @@ def token_hash(token):
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def send_email(to, subject, body):
-    """Send a plain-text email. Without SMTP settings (local dev) it's printed to the console instead."""
+def send_email(to, subject, body, html_body=None):
+    """Send an email: plain text, plus an HTML version when given. Without SMTP settings (local dev) it's printed."""
     if not os.getenv("SMTP_HOST"):
         print(f"\n--- Email to {to}: {subject}\n{body}\n---", flush=True)
         return
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"] = os.getenv("SMTP_FROM") or os.environ["SMTP_USER"]
+    msg["From"] = f"Job Tracker <{os.getenv('SMTP_FROM') or os.environ['SMTP_USER']}>"
     msg["To"] = to
     msg.set_content(body)
+    if html_body:
+        msg.add_alternative(html_body, subtype="html")
     with smtplib.SMTP(os.environ["SMTP_HOST"], int(os.getenv("SMTP_PORT", "587"))) as smtp:
         smtp.starttls()
         smtp.login(os.environ["SMTP_USER"], os.environ["SMTP_PASSWORD"])
         smtp.send_message(msg)
+
+
+def email_html(heading, paragraphs, button, link, extra="", footer=""):
+    """One branded layout for every email. Inline styles and tables, since email apps ignore stylesheets.
+    paragraphs and footer may contain markup, so escape anything a user typed before passing it in."""
+    text = "".join(f'<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#3c4149">{p}</p>' for p in paragraphs)
+    # The logo is the app's mark (three board columns) built from table cells, because Gmail drops inline SVG
+    bar = '<td style="vertical-align:top;padding-right:3px"><div style="width:4px;height:{h}px;background:#ffffff;border-radius:1px"></div></td>'
+    logo = "".join(bar.format(h=h) for h in (12, 9, 6))
+    return f"""<!doctype html>
+<html><body style="margin:0;padding:0;background:#f4f5f8">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f8;padding:32px 16px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+<tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px">
+<tr><td style="padding:0 4px 16px">
+  <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+    <td style="background:#5e6ad2;border-radius:6px;padding:5px 3px 5px 6px"><table role="presentation" cellpadding="0" cellspacing="0"><tr>{logo}</tr></table></td>
+    <td style="padding-left:10px;font-size:15px;font-weight:600;color:#1b1c1f">Job Tracker</td>
+  </tr></table>
+</td></tr>
+<tr><td style="background:#ffffff;border:1px solid #e3e5ea;border-radius:12px;padding:32px 28px">
+  <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;color:#1b1c1f">{heading}</h1>
+  {text}
+  {extra}
+  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 0"><tr>
+    <td style="background:#5e6ad2;border-radius:8px"><a href="{html.escape(link)}" style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none">{button}</a></td>
+  </tr></table>
+  <p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e3e5ea;font-size:13px;line-height:1.6;color:#6b6f76">{footer}</p>
+</td></tr>
+<tr><td style="padding:16px 4px 0;font-size:12px;color:#8a8f98;text-align:center">Job Tracker &middot; keep every application in one place</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>"""
 
 
 def send_verification(conn, user, background):
@@ -139,12 +176,37 @@ def send_verification(conn, user, background):
     conn.execute(
         "insert into email_verifications (token_hash, user_id) values (%s, %s)", (token_hash(token), user["id"])
     )
+    link = f"{APP_URL}/api/verify-email?token={token}"
+    email = html.escape(user["email"])
     body = (
-        "Confirm your email so Job Tracker can send your follow-up reminders:\n\n"
-        f"{APP_URL}/api/verify-email?token={token}\n\n"
-        f"The link works for {VERIFY_HOURS} hours. If you didn't create an account, you can ignore this email."
+        "Welcome to Job Tracker!\n\n"
+        f"Confirm {user['email']} to open your board:\n\n{link}\n\n"
+        "Once you're in, you can paste a job link to add it, drag applications from saved to offer, "
+        "and get an email when it's time to follow up.\n\n"
+        f"The link works for {VERIFY_HOURS} hours. If you didn't create an account, ignore this email: "
+        "the account can't be used until it's confirmed."
     )
-    background.add_task(send_email, user["email"], "Confirm your email for Job Tracker", body)
+    html_body = email_html(
+        "Confirm your email",
+        [
+            f"Thanks for signing up! Confirm <strong>{email}</strong> and your board opens right away.",
+            "Once you're in, you can:",
+        ],
+        "Confirm email",
+        link,
+        extra=(
+            '<ul style="margin:-8px 0 24px;padding-left:20px;font-size:15px;line-height:1.8;color:#3c4149">'
+            "<li>Paste a job link and the company and role fill in</li>"
+            "<li>Drag applications from saved to applied, interview and offer</li>"
+            "<li>Get an email when it's time to follow up</li></ul>"
+        ),
+        footer=(
+            f"This link works for {VERIFY_HOURS} hours. If the button doesn't work, paste this into your browser:<br>"
+            f'<a href="{html.escape(link)}" style="color:#5e6ad2;word-break:break-all">{html.escape(link)}</a><br><br>'
+            "Didn't sign up? You can ignore this email. The account can't be used until it's confirmed."
+        ),
+    )
+    background.add_task(send_email, user["email"], "Confirm your email for Job Tracker", body, html_body)
 
 
 def start_session(conn, user_id, response):

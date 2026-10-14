@@ -76,4 +76,16 @@ try:
 except HTTPException as e:
     assert e.status_code == 403
 
-print(f"{len(cases)} parse cases, password, login limit, link lookup, stats and email confirmation checks passed")
+from datetime import date, timedelta
+
+from remind import reminder
+
+sneaky = {"company": "<b>Evil</b>\nCorp", "role": "Dev & Ops", "url": 'https://x.co/"><script>', "status": "applied",
+          "follow_up": date.today() - timedelta(days=2)}
+subject, text, page = reminder([sneaky])
+assert "\n" not in subject and "Evil" in subject, subject
+assert "<b>Evil" not in page and "&lt;b&gt;Evil" in page, "typed text must be escaped in the HTML email"
+assert "<script>" not in page and "Dev &amp; Ops" in page
+assert "2 days overdue" in page and "2 days overdue" in text
+
+print(f"{len(cases)} parse cases, password, login limit, link lookup, stats, email confirmation and email escaping checks passed")
