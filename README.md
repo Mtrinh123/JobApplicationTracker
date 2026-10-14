@@ -66,7 +66,7 @@ frontend/
   app/landing.js  Login / sign up
   app/settings/   Settings page
 docker-compose.yml
-render.yaml       Deploy the backend + database on Render
+render.yaml       Deploy the backend on Render, Database on Neon
 .github/workflows/ci.yml  Tests + build on every push (see CI)
 ```
 

@@ -25,10 +25,4 @@ services:
       - key: SMTP_PASSWORD
         sync: false
       - key: DATABASE_URL
-        fromDatabase:
-          name: jobtracker-db
-          property: connectionString
-
-databases:
-  - name: jobtracker-db
-    plan: free
+        sync: false
