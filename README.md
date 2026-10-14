@@ -72,15 +72,6 @@ render.yaml       Deploy the backend + database on Render
 
 ## ✅ CI (GitHub Actions)
 
-Every push and pull request runs two checks on GitHub. No setup or secrets are needed: GitHub finds `.github/workflows/ci.yml` and runs it on its own.
-
-| Job | What it runs | Catches |
-|---|---|---|
-| **backend** | Python 3.12, `pip install -r requirements.txt`, `python test_main.py` | Broken login rules, link parsing, address blocking |
-| **frontend** | Node 22, `npm ci`, `npm run build` | Code that won't compile, which would also break the Vercel deploy |
-
-**See the results**
-
 1. Push to GitHub.
 2. Open the repo's **Actions** tab. Each push shows up as a run.
 3. ✅ green means both jobs passed. ❌ red: click the run, then the failed job, then the red step to read the error.
