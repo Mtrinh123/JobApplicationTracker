@@ -34,7 +34,7 @@ COOKIE_SECURE = os.getenv("COOKIE_SECURE") == "1"
 APP_URL = os.getenv("APP_URL", "http://localhost:3000").rstrip("/")
 VERIFY_HOURS = 24
 # What the frontend needs to know about the logged-in user
-USER_FIELDS = "id, email, email_verified, reminders"
+USER_FIELDS = "id, email, email_verified, reminders, is_demo"
 
 Status = Literal["saved", "applied", "interview", "offer", "rejected"]
 
@@ -77,6 +77,8 @@ insert into status_changes (job_id, status, changed_at)
 alter table users add column if not exists email_verified boolean not null default true;
 alter table users alter column email_verified set default false;
 alter table users add column if not exists reminders boolean not null default true;
+-- Throwaway accounts behind "Try the demo"
+alter table users add column if not exists is_demo boolean not null default false;
 create table if not exists email_verifications (
     token_hash text primary key,
     user_id int not null references users(id) on delete cascade,
@@ -222,7 +224,7 @@ def current_user(session: str | None = Cookie(default=None, alias=COOKIE)):
     if session:
         with db() as conn:
             user = conn.execute(
-                "select u.id, u.email, u.email_verified, u.reminders from sessions s join users u on u.id = s.user_id"
+                "select u.id, u.email, u.email_verified, u.reminders, u.is_demo from sessions s join users u on u.id = s.user_id"
                 " where s.token_hash = %s and s.created_at > now() - make_interval(days => %s)",
                 (token_hash(session), SESSION_DAYS),
             ).fetchone()
@@ -295,6 +297,11 @@ def login(creds: Credentials, response: Response):
 def logout(response: Response, session: str | None = Cookie(default=None, alias=COOKIE)):
     if session:
         with db() as conn:
+            # A demo account is gone once its visitor leaves (its jobs and sessions go with it)
+            conn.execute(
+                "delete from users where is_demo and id = (select user_id from sessions where token_hash = %s)",
+                (token_hash(session),),
+            )
             conn.execute("delete from sessions where token_hash = %s", (token_hash(session),))
     response.delete_cookie(COOKIE)
 
@@ -454,6 +461,69 @@ def delete_job(job_id: int, user=Depends(verified_user)):
             raise HTTPException(404, "Job not found")
 
 
+# --- Demo ---
+
+DEMO_HOURS = 2
+MAX_DEMOS = 500
+# (company, role, path, [(status, days ago), ...], follow-up in days, interview (in days, hour), notes)
+DEMO_JOBS = [
+    ("Globex", "Backend Engineer", "globex", [("saved", 20), ("applied", 18), ("interview", 6)], 5, (2, 14),
+     "Recruiter: Dana Lee. Second round is a system design chat, 45 min."),
+    ("Hooli", "Frontend Developer", "hooli", [("applied", 30), ("interview", 21), ("offer", 3)], None, None,
+     "Offer: $92k + benefits. Reply by Friday."),
+    ("Acme", "Software Engineer", "acme", [("saved", 12), ("applied", 10)], -1, None,
+     "Applied through the careers page. Referral from a classmate."),
+    ("Initech", "Full Stack Developer", "initech", [("applied", 9)], 0, None, ""),
+    ("Umbrella", "Data Analyst", "umbrella", [("applied", 25), ("rejected", 11)], None, None,
+     "Asked for feedback: they went with someone with more SQL experience."),
+    ("Stark Industries", "Junior .NET Developer", "stark", [("saved", 4), ("applied", 2)], 5, None, ""),
+    ("Wayne Enterprises", "Associate Software Engineer", "wayne", [("saved", 1)], 3, None,
+     "Posting closes soon. Tailor the summary for .NET first."),
+    ("Soylent", "React Developer", "soylent", [("applied", 15), ("rejected", 8)], None, None, ""),
+]
+
+
+def seed_demo(conn, user_id):
+    for company, role, path, steps, follow_up, interview, notes in DEMO_JOBS:
+        due = date.today() + timedelta(days=follow_up) if follow_up is not None else None
+        when = None
+        if interview:
+            when = datetime.combine(date.today() + timedelta(days=interview[0]), datetime.min.time()).replace(hour=interview[1])
+        job = conn.execute(
+            "insert into jobs (url, company, role, status, follow_up, interview_at, notes, user_id, created_at)"
+            " values (%s, %s, %s, %s, %s, %s, %s, %s, now() - make_interval(days => %s)) returning id",
+            (f"https://example.com/jobs/{path}", company, role, steps[-1][0], due, when, notes, user_id, steps[0][1]),
+        ).fetchone()
+        for status, days_ago in steps:
+            conn.execute(
+                "insert into status_changes (job_id, status, changed_at)"
+                " values (%s, %s, now() - make_interval(days => %s))",
+                (job["id"], status, days_ago),
+            )
+
+
+@app.post("/demo", status_code=201)
+def start_demo(response: Response):
+    """A throwaway account with a sample board, so visitors can try everything without signing up."""
+    with db() as conn, conn.transaction():
+        # ponytail: old demos are cleaned up whenever a new one starts, plus on log out. Fine at portfolio
+        # traffic; a scheduled cleanup job if it ever gets busy
+        conn.execute(
+            "delete from users where is_demo and created_at < now() - make_interval(hours => %s)", (DEMO_HOURS,)
+        )
+        if conn.execute("select count(*) as n from users where is_demo").fetchone()["n"] >= MAX_DEMOS:
+            raise HTTPException(503, "The demo is busy right now. Please try again in a little while")
+        user = conn.execute(
+            "insert into users (email, password_hash, email_verified, reminders, is_demo)"
+            f" values (%s, %s, true, false, true) returning {USER_FIELDS}",
+            # .invalid is reserved and never receives mail, and nobody knows the random password
+            (f"demo-{secrets.token_hex(6)}@demo.invalid", hash_password(secrets.token_urlsafe(24))),
+        ).fetchone()
+        seed_demo(conn, user["id"])
+        start_session(conn, user["id"], response)
+    return user
+
+
 # --- Stats ---
 
 RESPONDED = {"interview", "offer", "rejected"}
@@ -500,7 +570,7 @@ def due_jobs():
         return conn.execute(
             "select j.*, u.email from jobs j join users u on u.id = j.user_id"
             " where j.follow_up <= %s and j.status in ('saved', 'applied', 'interview')"
-            " and u.email_verified and u.reminders"
+            " and u.email_verified and u.reminders and not u.is_demo"
             " order by u.email, j.follow_up",
             (date.today(),),
         ).fetchall()

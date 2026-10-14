@@ -12,8 +12,8 @@ const PREVIEW = [
   ["Offer", [["Hooli", "Frontend Developer"]]],
 ];
 
-export default function Landing({ onLogin, notice }) {
-  const [signup, setSignup] = useState(false);
+export default function Landing({ onLogin, notice, startSignup = false }) {
+  const [signup, setSignup] = useState(startSignup);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -30,6 +30,17 @@ export default function Landing({ onLogin, notice }) {
     try {
       const body = JSON.stringify(creds);
       onLogin(await api(signup ? "/register" : "/login", { method: "POST", body }));
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  }
+
+  async function tryDemo() {
+    setBusy(true);
+    setError("");
+    try {
+      onLogin(await api("/demo", { method: "POST" }));
     } catch (err) {
       setError(err.message);
       setBusy(false);
@@ -54,6 +65,10 @@ export default function Landing({ onLogin, notice }) {
               <li>Keep notes and export everything to CSV</li>
               <li>Add interviews to your calendar and see your response rate</li>
             </ul>
+            <div className="demo-cta">
+              <button type="button" onClick={tryDemo} disabled={busy}>Try the demo</button>
+              <span>No sign-up. Opens a sample board you can play with.</span>
+            </div>
           </div>
 
           <form className="auth" onSubmit={submit}>

@@ -66,6 +66,8 @@ export default function Home() {
   const [adding, setAdding] = useState(false);
   const [dropTarget, setDropTarget] = useState(null);
   const [notice, setNotice] = useState("");
+  // Set when a demo visitor chooses "Create your own account", so the landing opens on the sign-up form
+  const [wantsSignup, setWantsSignup] = useState(false);
   const [resendStatus, setResendStatus] = useState("");
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -91,7 +93,24 @@ export default function Home() {
     );
     history.replaceState(null, "", "/");
   }, []);
-  useEffect(() => { if (user) load(); }, [user]);
+  useEffect(() => { if (user?.email_verified) load(); }, [user]);
+
+  // The link is often opened in another tab. When the person comes back to this one, check again so the
+  // board opens on its own instead of still asking them to confirm
+  const waiting = user && !user.email_verified;
+  useEffect(() => {
+    if (!waiting) return;
+    const recheck = () => {
+      if (document.visibilityState !== "visible") return;
+      api("/me").then((me) => me.email_verified && setUser(me)).catch(() => {});
+    };
+    window.addEventListener("focus", recheck);
+    document.addEventListener("visibilitychange", recheck);
+    return () => {
+      window.removeEventListener("focus", recheck);
+      document.removeEventListener("visibilitychange", recheck);
+    };
+  }, [waiting]);
 
   async function run(promise) {
     try {
@@ -113,6 +132,11 @@ export default function Home() {
   async function logout() {
     await api("/logout", { method: "POST" }).catch(() => {});
     signedOut();
+  }
+
+  async function leaveDemoToSignUp() {
+    setWantsSignup(true);
+    await logout();
   }
 
   async function resendEmail() {
@@ -183,7 +207,7 @@ export default function Home() {
   }
 
   if (user === undefined) return null;
-  if (!user) return <Landing onLogin={setUser} notice={notice} />;
+  if (!user) return <Landing onLogin={(u) => { setWantsSignup(false); setUser(u); }} notice={notice} startSignup={wantsSignup} />;
 
   if (!user.email_verified) {
     return (
@@ -265,7 +289,7 @@ export default function Home() {
             onChange={(e) => setSearch(e.target.value)}
           />
           <button onClick={() => downloadCsv(jobs)} disabled={!all.length}>Export CSV</button>
-          <span className="who">{user.email}</span>
+          <span className="who">{user.is_demo ? "Demo account" : user.email}</span>
           <Link href="/settings" className="button">Settings</Link>
           <button onClick={logout}>Log out</button>
         </div>
@@ -273,6 +297,16 @@ export default function Home() {
 
       <main className="app">
         {notice && <p className="notice" role="status">{notice}</p>}
+
+        {user.is_demo && (
+          <div className="demo-banner">
+            <p>
+              <strong>You're trying the demo.</strong> These are sample jobs, so drag cards, add jobs and edit notes
+              freely. Everything is deleted when you log out, or after a couple of hours.
+            </p>
+            <button type="button" className="primary" onClick={leaveDemoToSignUp}>Create your own account</button>
+          </div>
+        )}
 
         <form className="add" onSubmit={add}>
           <label className="url">

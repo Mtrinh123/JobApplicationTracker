@@ -2,6 +2,7 @@
 from fastapi import HTTPException
 
 from main import (
+    DEMO_JOBS,
     FAIL_WINDOW,
     MAX_FAILS,
     check_password,
@@ -80,6 +81,11 @@ from datetime import date, timedelta
 
 from remind import reminder
 
+# Sample board: every status is real and each job's history runs forward in time
+for company, role, path, steps, follow_up, interview, notes in DEMO_JOBS:
+    assert all(status in ("saved", "applied", "interview", "offer", "rejected") for status, _ in steps), company
+    assert [d for _, d in steps] == sorted((d for _, d in steps), reverse=True), company
+
 sneaky = {"company": "<b>Evil</b>\nCorp", "role": "Dev & Ops", "url": 'https://x.co/"><script>', "status": "applied",
           "follow_up": date.today() - timedelta(days=2)}
 subject, text, page = reminder([sneaky])
@@ -88,4 +94,4 @@ assert "<b>Evil" not in page and "&lt;b&gt;Evil" in page, "typed text must be es
 assert "<script>" not in page and "Dev &amp; Ops" in page
 assert "2 days overdue" in page and "2 days overdue" in text
 
-print(f"{len(cases)} parse cases, password, login limit, link lookup, stats, email confirmation and email escaping checks passed")
+print(f"{len(cases)} parse cases, password, login limit, link lookup, stats, email confirmation, email escaping and demo data checks passed")

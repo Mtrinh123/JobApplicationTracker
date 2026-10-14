@@ -84,7 +84,7 @@ export default function Settings() {
       <header className="nav">
         <Link href="/" className="brand-link" aria-label="Job Tracker, back to your board"><Brand /></Link>
         <div className="tools">
-          <span className="who">{user.email}</span>
+          <span className="who">{user.is_demo ? "Demo account" : user.email}</span>
           <Link href="/" className="button">Back to board</Link>
           <button onClick={logout}>Log out</button>
         </div>
@@ -92,6 +92,12 @@ export default function Settings() {
 
       <main className="settings">
         <h1>Settings</h1>
+        {user.is_demo && (
+          <p className="notice" role="status">
+            This is a demo account, so there's no real email or password behind it. Log out to delete it, or create
+            your own account to keep a board.
+          </p>
+        )}
 
         <section className="panel" aria-labelledby="account-title">
           <div className="panel-head">
