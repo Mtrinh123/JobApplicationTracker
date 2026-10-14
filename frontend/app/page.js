@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import Brand from "./brand";
 import Landing from "./landing";
@@ -67,6 +67,9 @@ export default function Home() {
   const [dropTarget, setDropTarget] = useState(null);
   const [notice, setNotice] = useState("");
   const [resendStatus, setResendStatus] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const deleteDialog = useRef(null);
 
   function fail(e) {
     if (e.status === 401) setUser(null);
@@ -129,6 +132,22 @@ export default function Home() {
     else setResendStatus("Not confirmed yet. Click the link in the email, then try again.");
   }
 
+  // Same as in Settings: a wrong address can't be confirmed, so let them remove it and sign up again
+  async function deleteAccount(e) {
+    e.preventDefault();
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      await api("/me", { method: "DELETE", body: JSON.stringify(Object.fromEntries(new FormData(e.target))) });
+      deleteDialog.current.close();
+      signedOut();
+    } catch (err) {
+      if (err.status === 401) signedOut();
+      else setDeleteError(err.message);
+    }
+    setDeleting(false);
+  }
+
   function add(e) {
     e.preventDefault();
     const form = e.target;
@@ -187,6 +206,34 @@ export default function Home() {
             <button type="button" onClick={resendEmail}>Resend email</button>
             <p className="verify-status" role="status">{resendStatus}</p>
           </div>
+
+          <p className="verify-help">
+            Wrong email, or it never arrived?{" "}
+            <button type="button" className="link" onClick={() => { setDeleteError(""); deleteDialog.current.showModal(); }}>
+              Delete this account
+            </button>{" "}
+            and sign up again.
+          </p>
+
+          <dialog ref={deleteDialog} aria-labelledby="delete-title">
+            <form className="auth" onSubmit={deleteAccount}>
+              <h2 id="delete-title">Delete your account?</h2>
+              <p>
+                This permanently deletes <strong>{user.email}</strong>. It can't be undone.
+              </p>
+              <label>
+                Enter your password to confirm
+                <input name="password" type="password" autoComplete="current-password" required />
+              </label>
+              {deleteError && <p className="error" role="alert">{deleteError}</p>}
+              <div className="actions">
+                <button type="button" onClick={() => deleteDialog.current.close()}>Cancel</button>
+                <button className="danger solid" disabled={deleting}>
+                  {deleting ? "Deleting..." : "Delete forever"}
+                </button>
+              </div>
+            </form>
+          </dialog>
         </main>
       </>
     );
