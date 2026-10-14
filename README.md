@@ -1,5 +1,7 @@
 # 📋 Job Application Tracker
 
+[![CI](https://github.com/Mtrinh123/JobApplicationTracker/actions/workflows/ci.yml/badge.svg)](https://github.com/Mtrinh123/JobApplicationTracker/actions/workflows/ci.yml)
+
 Paste a job link, track it through your pipeline, and never forget to follow up.
 
 **Next.js** · **FastAPI** · **PostgreSQL**
@@ -65,8 +67,40 @@ frontend/
   app/settings/   Settings page
 docker-compose.yml
 render.yaml       Deploy the backend + database on Render
-
+.github/workflows/ci.yml  Tests + build on every push (see CI)
 ```
+
+## ✅ CI (GitHub Actions)
+
+Every push and pull request runs two checks on GitHub. No setup or secrets are needed: GitHub finds `.github/workflows/ci.yml` and runs it on its own.
+
+| Job | What it runs | Catches |
+|---|---|---|
+| **backend** | Python 3.12, `pip install -r requirements.txt`, `python test_main.py` | Broken login rules, link parsing, address blocking |
+| **frontend** | Node 22, `npm ci`, `npm run build` | Code that won't compile, which would also break the Vercel deploy |
+
+**See the results**
+
+1. Push to GitHub.
+2. Open the repo's **Actions** tab. Each push shows up as a run.
+3. ✅ green means both jobs passed. ❌ red: click the run, then the failed job, then the red step to read the error.
+
+The badge at the top of this README shows the latest result on `main`.
+
+**Run the same checks locally before pushing**
+
+```bash
+cd backend && python test_main.py
+cd frontend && npm ci && npm run build
+```
+
+**If a check fails**
+
+| Problem | Fix |
+|---|---|
+| `backend` fails but tests pass locally | A package is missing from `requirements.txt` |
+| `frontend` fails at `npm ci` | `package-lock.json` is out of date. Run `npm install` and commit the lock file |
+| `frontend` fails at `npm run build` | Run `npm run build` locally, it shows the same error |
 
 ## 📧 Email
 
