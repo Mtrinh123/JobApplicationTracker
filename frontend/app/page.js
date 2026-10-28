@@ -405,7 +405,8 @@ export default function Home() {
                       value={job.status}
                       onChange={(e) => update(job.id, { status: e.target.value })}
                     >
-                      {STATUSES.map((s) => <option key={s}>{s}</option>)}
+                      {/* The value stays lowercase for the API; only the label is capitalized */}
+                      {STATUSES.map((s) => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
                     </select>
                     <label className="follow">
                       Follow up
