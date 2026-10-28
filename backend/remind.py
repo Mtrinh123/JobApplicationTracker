@@ -1,8 +1,11 @@
 """Email every user with confirmed email and reminders on their due follow-ups.
 
-Without SMTP settings the emails are printed instead. Run it daily with cron or Task Scheduler.
+Without SMTP settings the emails are printed instead. Runs every morning from GitHub Actions
+(.github/workflows/reminders.yml), or by hand: python remind.py
 """
 import html
+import os
+import sys
 from datetime import date
 from itertools import groupby
 
@@ -62,11 +65,20 @@ def reminder(jobs):
 
 
 if __name__ == "__main__":
-    due = due_jobs()
-    if not due:
-        print("No follow-ups due.")
+    # Logs of a public repo's Actions runs are public: never print an email there
+    if os.getenv("GITHUB_ACTIONS") and not os.getenv("SMTP_HOST"):
+        sys.exit("SMTP_HOST is not set, so emails would be printed to the public log. Add the SMTP secrets first.")
 
+    due = due_jobs()
+    sent = failed = 0
     for email, jobs in groupby(due, key=lambda job: job["email"]):
-        jobs = list(jobs)
-        send_email(email, *reminder(jobs))
-        print(f"Sent {len(jobs)} reminder(s) to {email}")
+        try:
+            send_email(email, *reminder(list(jobs)))
+            sent += 1
+        except Exception as e:  # one bad address shouldn't stop everyone else's reminders
+            failed += 1
+            print(f"A reminder failed: {type(e).__name__}")
+    # Counts only, no addresses or job details
+    print(f"{len(due)} follow-up(s) due, emailed {sent} user(s), {failed} failed.")
+    if failed:
+        sys.exit(1)

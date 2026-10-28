@@ -74,7 +74,7 @@ npm run dev
 ```
 backend/
   main.py         API, login, database setup
-  remind.py       Daily follow-up reminders
+  remind.py       Daily follow-up reminders (run by .github/workflows/reminders.yml)
   test_main.py    Tests (python test_main.py)
 frontend/
   next.config.mjs Forwards /api to the backend
@@ -133,12 +133,16 @@ cd frontend && npm ci && npm run build
 
 The app sends two kinds of email: a **confirmation link** when someone signs up, and **daily follow-up reminders** listing each due job with how overdue it is. Both are branded HTML emails with a plain-text copy for email apps that don't show HTML. New accounts can't use the board until they click the confirmation link, which keeps out bots signing up with made-up addresses. Reminders only go to accounts that left them on in Settings.
 
-
+**When reminders go out:** every morning at 12:00 UTC (8 AM Eastern in summer, 7 AM in winter), from the GitHub Actions workflow `.github/workflows/reminders.yml`. To send them right away, open the **Actions** tab, pick **Daily reminders** and click **Run workflow**. Or run it locally:
 
 ```bash
 cd backend
 .venv\Scripts\python remind.py
 ```
+
+The workflow needs these repo secrets (**Settings → Secrets and variables → Actions**), with the same values as the API on Render: `DATABASE_URL`, `APP_URL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`.
+
+Actions logs are public on a public repo, so the script prints only counts, never email addresses, and refuses to run there without the SMTP settings.
 
 Accounts created before email confirmation existed count as confirmed.
 
@@ -200,4 +204,4 @@ Full interactive docs: http://localhost:8000/docs locally, or [live](https://job
 - [x] Actually deploy it (Vercel + Render + Neon + Brevo)
 - [x] Required email confirmation, branded HTML emails
 - [x] One-click demo with a sample board
-- [ ] Send the daily reminders on a schedule (GitHub Actions cron)
+- [x] Send the daily reminders on a schedule (GitHub Actions cron)
